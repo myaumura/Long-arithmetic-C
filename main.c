@@ -1,14 +1,12 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #define MAX_DIGITS 2500
-#define SUM '+'
-#define SUB '-'
-#define MUL '*'
-#define EXP '^'
-#define FAC '!'
 
+// MARK: - Структура большого числа
 typedef struct {
     int digits[MAX_DIGITS];
     short int length;
@@ -17,54 +15,49 @@ typedef struct {
 
 // MARK: - Expression
 
-void read_expression(void);
+void parse_expression(void);
+bn perform_operation(char, bn*, bn*);
+void execute_expression(char*, bn*);
 
 // MARK: - Init
 
-void bn_create(bn*, char*);             // success
-void bn_init(bn*);                      // success
-void bn_print(bn*);                     // success
+bn bn_create(char*);             // success
+void bn_init(bn*);               // success
+void bn_print(bn*);              // success
 
 // MARK: - Operaions
 
-void bn_add(bn*, bn*, bn*);             // success
-void bn_sub(bn*, bn*, bn*);             // success
-void bn_mul(bn*, bn*, bn*);             // success
-void bn_div_by_2(bn*);
-void bn_fact(bn*, bn*);                 // success
-void bn_pow(bn*, bn*, bn*);             // success
-void bn_sum_from_to(bn*, bn*, bn*);
+bn bn_add(bn*, bn*);             // success
+bn bn_sub(bn*, bn*);             // success
+bn bn_mul(bn*, bn*);             // success
+void bn_div_by_2(bn*);           // success
+bn bn_fact(bn*);                 // success
+bn bn_pow(bn*, bn*);             // success
+bn bn_sum_from_to(bn*, bn*);
 
 // MARK: - Support
 
-int  bn_is_zero(bn*);                   // success
-void bn_dec(bn*);                       // success
-void bn_inc(bn*);                       // success
-int  bn_cmp(bn*, bn*);                  // success
-void bn_clear_nulls(bn*);                  // success
-void bn_copy(bn*, bn*);                 // success
+int  bn_is_zero(bn*);            // success
+void bn_dec(bn*);                // success
+void bn_inc(bn*);                // success
+int  bn_cmp(bn*, bn*);           // success
+void bn_clear_nulls(bn*);        // success
+void bn_copy(bn*, bn*);          // success
 
 // MARK: - Main
 
 int main(void) {
+    char buffer[2500];
+    bn result, num1, num2;
     
-    char str1[MAX_DIGITS] = "101", str2[MAX_DIGITS] = "101";
-    bn num1, num2, result;
+    num1 = bn_create("1231");
+    num2 = bn_create("4241");
     
-    bn_create(&num1, str1);
-    bn_create(&num2, str2);
-    bn_init(&result);
-    
-    /* test examples
-     bn_sub(&result, &num1, &num2);
-     bn_pow(&result, &num1, &num2);
-     bn_fact(&result, &num1);
-     bn_mul(&result, &num1, &num2);
-     bn_pow(&result, &num1, &num2);
-     bn_sum_from_to(&result, &num1, &num2);
-     */
-    
+    result = bn_sub(&num1, &num2);
     bn_print(&result);
+    
+//    fgets(buffer, sizeof(buffer), stdin);
+//    parse_expression();
     return EXIT_SUCCESS;
 }
 
@@ -77,39 +70,49 @@ void bn_init(bn * num) {
 
 // MARK: - Создание большого числа
 
-void bn_create(bn *num, char *str) {
+bn bn_create(char *str) {
+    bn num;
+    bn_init(&num);
     if (str[0] == '-') {
-        num->sign = -1;
+        num.sign = -1;
         str++;
-    } else num->sign = 1;
-    num->length = strlen(str);
-    memset(num->digits, 0x00, sizeof(int) * MAX_DIGITS);
-    for (short int i = 0; i < num->length; i++) num->digits[num->length - i - 1] = str[i] - '0';
+    } else num.sign = 1;
+    num.length = strlen(str);
+    memset(num.digits, 0x00, sizeof(int) * MAX_DIGITS);
+    for (short int i = 0; i < num.length; i++) num.digits[num.length - i - 1] = str[i] - '0';
+    return num;
 }
 
 // MARK: - Вывод большого числа
 
 void bn_print(bn *num) {
+    if (num->sign == -1) { printf("-"); }
     for (short int i = num->length - 1 ; i >= 0; i--) printf("%d", num->digits[i]);  // потому что идем справа налево <--
     printf("\n");
 }
 
 // MARK: - Сложение больших чисел
 
-void bn_add(bn *result, bn *first_num, bn *second_num) {
+bn bn_add(bn *first_num, bn *second_num) {
+    bn result;
+    bn_init(&result);
     short int carry_flag = 0,sum = 0;
     
     for (int i = 0; i < MAX_DIGITS; i++) {
         sum = first_num->digits[i] + second_num->digits[i] + carry_flag;
         carry_flag = sum / 10;
-        result->digits[i] = sum % 10;
+        result.digits[i] = sum % 10;
     }
-    bn_clear_nulls(result);
+    bn_clear_nulls(&result);
+    return result;
 }
 
 // MARK: - Вычитание больших чисел
 
-void bn_sub(bn* result, bn *first_num, bn *second_num) {
+bn bn_sub(bn *first_num, bn *second_num) {
+    bn result;
+    bn_init(&result);
+    
     short int carry_flag = 0;
     
     for(short int i = 0; i < MAX_DIGITS; i++) {
@@ -123,9 +126,11 @@ void bn_sub(bn* result, bn *first_num, bn *second_num) {
             switch (bn_cmp(first_num, second_num)) {
                 case 1:
                     sub = first_num->digits[i] - second_num->digits[i] - carry_flag;
-                    
+                    break;
                 case -1:
                     sub = second_num->digits[i] - first_num->digits[i] - carry_flag;
+                    result.sign = -1;
+                    break;
             }
         }
         
@@ -135,43 +140,34 @@ void bn_sub(bn* result, bn *first_num, bn *second_num) {
         } else {
             carry_flag = 0;
         }
-        result->digits[i] = sub;
+        result.digits[i] = sub;
     }
-    bn_clear_nulls(result);
-
-    //    size_t res, temp1, temp2, borrow = 0;
-    //
-    //    for (int i = 0; i < MAX_DIGITS; i++) {
-    //        temp1 = (size_t)first_num->digits[i] + (SIZE_MAX + 1); /* + number_base */
-    //        temp2 = (size_t)second_num->digits[i] + borrow;
-    //        res = temp1 - temp2;
-    //        result->digits[i] = res % SIZE_MAX; /* "modulo number_base" == "% (number_base - 1)" if number_base is 2^N */
-    //        borrow = (res <= SIZE_MAX);
-    //    }
-    //    bn_clear_nulls(result);
+    bn_clear_nulls(&result);
+    return result;
 }
 
 // MARK: - Умножение больших чисел
 
-void bn_mul(bn* result, bn* first_number, bn* second_num) {
-    bn temp1, temp2;
+bn bn_mul(bn* first_number, bn* second_num) {
+    bn result, temp1, temp2;
     bn_copy(first_number, &temp1);
     bn_copy(second_num, &temp2);
-    bn_init(result);
+    bn_init(&result);
     
     short int current = 0;
     
     for(short int i = 0; i < temp1.length; i++) {
         for (short int j = 0; j < temp2.length; j++) {
             current = temp1.digits[i] * temp2.digits[j];
-            result->digits[i + j] += current;
+            result.digits[i + j] += current;
         }
     }
-    for(short int i = 0; i < result->length - 1; i++) {
-        result->digits[i + 1] +=  result->digits[i] / 10;
-        result->digits[i] %= 10;
+    for(short int i = 0; i < result.length - 1; i++) {
+        result.digits[i + 1] +=  result.digits[i] / 10;
+        result.digits[i] %= 10;
     }
-    bn_clear_nulls(result);
+    bn_clear_nulls(&result);
+    return result;
 }
 
 void bn_div_by_2(bn* num) {
@@ -187,28 +183,31 @@ void bn_div_by_2(bn* num) {
 
 // MARK: - Факториал большого числа
 
-void bn_fact(bn* result, bn* num) {
-    bn temp;
+bn bn_fact(bn* num) {
+    bn result, temp;
     bn_copy(num, &temp);
     bn_dec(num);
     
     while (!bn_is_zero(num)) {
-        bn_mul(result, &temp, num);
+        result = bn_mul(&temp, num);
         bn_dec(num);
-        bn_copy(result, &temp);
-        bn_init(result);
+        bn_copy(&result, &temp);
+        bn_init(&result);
     }
-    bn_copy(&temp, result);
+    bn_copy(&temp, &result);
+    return result;
 }
 
 // MARK: - Возведение в степень большого числа
 
-void bn_pow(bn* result, bn* num, bn* exp) {
+bn bn_pow(bn* num, bn* exp) {
+    bn result;
+    
     if (bn_is_zero(exp)) {
-        result->digits[0] = 1;
-        result->length = 1;
+        result.digits[0] = 1;
+        result.length = 1;
     } else if ((num->length == 1) && (num->digits[0] == 1)) {
-        bn_copy(num, result);
+        bn_copy(num, &result);
     } else {
         bn temp;
         bn_init(&temp);
@@ -216,33 +215,42 @@ void bn_pow(bn* result, bn* num, bn* exp) {
         bn_dec(exp);
         
         while (!bn_is_zero(exp)) {
-            bn_mul(result, &temp, num);
+            result = bn_mul(&temp, num);
             bn_dec(exp);
-            bn_copy(result, &temp);
-            bn_init(result);
+            bn_copy(&result, &temp);
         }
-        bn_copy(&temp, result);
+        bn_copy(&temp, &result);
     }
+    return result;
 }
 
 // MARK: - Сумма всех чисел от и до
 
-void bn_sum_from_to(bn* result, bn* first_num, bn* second_num) {
-    bn temp;
-    bn_init(&temp);
-    
-    bn_copy(second_num, result);
-    bn_add(result, result, first_num);
+bn bn_sum_from_to(bn* first_num, bn* second_num) {
+    bn result, count;
+    int flag = 0;
+    bn_copy(second_num, &result);
     
     if (first_num->sign == -1) {
-        bn_add(&temp, second_num, first_num);
+        result = bn_sub(second_num, first_num);
+        if (bn_cmp(first_num, second_num) == 1) {
+            flag = 1;
+        }
     } else {
-        bn_sub(&temp, second_num, first_num);
+        result = bn_add(second_num, first_num);
     }
     
-    bn_inc(&temp);
-    bn_mul(result, result, &temp);
-    bn_div_by_2(result);
+    if (first_num->sign == -1) {
+        count = bn_add(second_num, first_num);
+    } else {
+        count = bn_sub(second_num, first_num);
+    }
+    
+    bn_inc(&count);
+    result = bn_mul(&result, &count);
+    bn_div_by_2(&result);
+    if (flag) { result.sign = -1; }
+    return result;
 }
 
 // MARK: - Проверка числа на ноль
@@ -326,6 +334,46 @@ void bn_copy(bn* src, bn* dst) {
 
 // MARK: - Чтение выражения
 
-void read_expression(void) {
+void parse_expression(void) {
+    char buffer[2500];
+    fgets(buffer, sizeof(buffer), stdin);
+    int pos = 0;
     
+    while (buffer[pos] != '\0') {
+        if (buffer[pos] != '!') {
+            getchar();
+        }
+    }
 }
+
+// MARK: - Операции
+
+bn perform_operation(char operator, bn* first_num, bn* second_num) {
+    bn result;
+    bn_init(&result);
+    
+    switch (operator) {
+        case '+':
+            result = bn_add(first_num, second_num);
+            break;
+        case '-':
+            result = bn_add(first_num, second_num);
+            break;
+        case '*':
+            result = bn_mul(first_num, second_num);
+            break;
+        case '^':
+            result = bn_pow(first_num, second_num);
+            break;
+        case '!':
+            result = bn_fact(first_num);
+            break;
+        default:
+            break;
+    }
+    return result;
+}
+
+// MARK: - Вычисление выражения
+
+void execute_expresssion(char* expression, bn* result) { }
