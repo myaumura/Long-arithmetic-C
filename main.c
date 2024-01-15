@@ -6,6 +6,26 @@
 
 #define MAX_DIGITS 2500
 
+// MARK: - Stack
+
+char stack[25];
+int top = -1;
+
+// MARK: - Stack operators
+
+void push(char);
+char pop(void);
+int priority(char);
+int is_operator(char);
+void convert(char[], char[]);
+void push_int(int);
+void itoa(int, char[]);
+void reverse(char[]);
+char pop_int(void);
+int evaluate(char*);
+void string_to_tokens(char *expression, char(*)[], char[]);
+void add_space(char *expression, char *result);
+
 // MARK: - Структура большого числа
 typedef struct {
     int digits[MAX_DIGITS];
@@ -17,7 +37,14 @@ typedef struct {
 
 void parse_expression(void);
 bn perform_operation(char, bn*, bn*);
-void execute_expression(char*, bn*);
+void execute_expression(char*);
+bn evaluate_expression(char*);
+
+
+bn execute_bn(char*);
+
+int is_digit(char);
+
 
 // MARK: - Init
 
@@ -47,17 +74,9 @@ void bn_copy(bn*, bn*);          // success
 // MARK: - Main
 
 int main(void) {
-    char buffer[2500];
-    bn result, num1, num2;
     
-    num1 = bn_create("1231");
-    num2 = bn_create("4241");
+    parse_expression();
     
-    result = bn_sub(&num1, &num2);
-    bn_print(&result);
-    
-//    fgets(buffer, sizeof(buffer), stdin);
-//    parse_expression();
     return EXIT_SUCCESS;
 }
 
@@ -335,14 +354,28 @@ void bn_copy(bn* src, bn* dst) {
 // MARK: - Чтение выражения
 
 void parse_expression(void) {
+    
     char buffer[2500];
     fgets(buffer, sizeof(buffer), stdin);
-    int pos = 0;
-    
-    while (buffer[pos] != '\0') {
-        if (buffer[pos] != '!') {
-            getchar();
-        }
+    execute_expression(buffer);
+}
+
+// MARK: - Функция определения приоритета оператора
+
+int priority(char operator) {
+    switch (operator) {
+        case '!':
+            return 3;
+        case '^':
+            return 2;
+        case '*':
+            return 1;
+        case '+':
+            return 0;
+        case '-':
+            return 0;
+        default:
+            return -1;
     }
 }
 
@@ -357,7 +390,7 @@ bn perform_operation(char operator, bn* first_num, bn* second_num) {
             result = bn_add(first_num, second_num);
             break;
         case '-':
-            result = bn_add(first_num, second_num);
+            result = bn_sub(first_num, second_num);
             break;
         case '*':
             result = bn_mul(first_num, second_num);
@@ -374,6 +407,196 @@ bn perform_operation(char operator, bn* first_num, bn* second_num) {
     return result;
 }
 
+// MARK: - execute bn
+
+bn execute_bn(char* str) {
+    bn num;
+    bn_init(&num);
+    
+    return num;
+}
+
 // MARK: - Вычисление выражения
 
-void execute_expresssion(char* expression, bn* result) { }
+void execute_expression(char* buffer) {
+    
+    char temp[2500], postfix[2500];
+    char numbers[MAX_DIGITS][MAX_DIGITS];
+    char operators[MAX_DIGITS];
+    size_t i = 0, flag = 0;
+    
+    while (buffer[i] != '\0') {
+        if (buffer[i] == '\n') {
+            flag = 1;
+            temp[i] = buffer[i + 1];
+        } else {
+            temp[i] = buffer[i];
+        }
+        if (flag) {
+            temp[i] = buffer[i + 1];
+        }
+        i++;
+    }
+    temp[i] = '\0';
+    string_to_tokens(temp, numbers, operators);
+    //    convert(temp, postfix);
+    //    printf("%s\n", postfix);
+    //    int result = evaluate(postfix);
+    //    printf("%d", result);
+    
+}
+
+// MARK: - Проверка символа на оператор
+
+int is_operator(char c) {
+    return (c == '+' || c == '-' || c == '*' || c == '^' || c == '!');
+}
+
+// MARK: - Проверка цифры
+
+int is_digit(char c) {
+    return (c >= '0' && c <= '9');
+}
+
+// MARK: - Push operator
+
+void push(char item) {
+    stack[++top] = item;
+}
+
+// MARK: - Pop operator
+
+char pop(void) {
+    return stack[top--];
+}
+
+// MARK: - Convert from infix to postfix
+
+void convert(char infix[], char postfix[]) {
+    int i, symbol, j = 0;
+    stack[++top] = '#';
+    
+    for (i = 0; i < strlen(infix); i++) {
+        symbol = infix[i];
+        
+        if (is_operator(symbol) == 0) {
+            postfix[j] = symbol;
+            j++;
+        } else {
+            if (symbol == '(') {
+                push(symbol);
+            } else {
+                if (symbol == ')') {
+                    while (stack[top] != '(') {
+                        postfix[j] = pop();
+                        j++;
+                    }
+                    pop(); // pop out ( bracket
+                } else {
+                    if (priority(symbol) > priority(stack[top])) {
+                        push(symbol);
+                    } else {
+                        while (priority(symbol) <= priority(stack[top])) {
+                            postfix[j] = pop();
+                            j++;
+                        }
+                        push(symbol);
+                    }
+                }
+            }
+        }
+    }
+    
+    while (stack[top] != '#') {
+        postfix[j] = pop();
+        j++;
+    }
+    postfix[j] = '\0';
+}
+
+// MARK: - Int stack
+
+int stack_int[25];
+int top_int = -1;
+
+// MARK: - Push int
+
+void push_int(int item) {
+    stack_int[++top_int] = item;
+}
+
+// MARK: - Pop int
+
+char pop_int(void) {
+    return stack_int[top_int--];
+}
+
+int evaluate(char* postfix) {
+    char ch;
+    int i = 0, operand1, operand2;
+    
+    while ((ch = postfix[i++]) != '\0') {
+        
+        if (isdigit(ch)) {
+            push_int(ch - '0');
+        } else {
+            operand2 = pop_int();
+            operand1 = pop_int();
+            
+            switch (ch) {
+                case '+':
+                    push_int(operand1 + operand2);
+                    break;
+                default:
+                    break;
+            }
+        }
+        
+    }
+    return stack_int[top_int];
+}
+
+// MARK: - Добавление пробела перед оператором
+
+void add_space(char *expression, char *result) {
+    size_t len = strlen(expression);
+    int resultIndex = 0;
+
+    for (int i = 0; i < len; i++) {
+        if (expression[i] == '+' || expression[i] == '-' || expression[i] == '*' || expression[i] == '!' || expression[i] == '^') {
+            result[resultIndex++] = ' ';
+            result[resultIndex++] = expression[i];
+            result[resultIndex++] = ' ';
+        } else if (expression[i] != ' ' && expression[i] != '\n') {
+            result[resultIndex++] = expression[i];
+        }
+    }
+    result[resultIndex] = '\0';
+}
+
+// MARK: - Разделение строки на числа и операторы
+
+void string_to_tokens(char *expression, char numbers[][MAX_DIGITS], char operators[]) {
+    
+    char spacedExpression[2 * MAX_DIGITS];
+    add_space(expression, spacedExpression);
+    
+    // Инициализируем счетчики
+    int num_count = 0;
+    int op_count = 0;
+    
+    // Разбиваем выражение на числа и операторы
+    char *token = strtok(spacedExpression, " \n");
+    while (token != NULL) {
+        if (token[0] >= '0' && token[0] <= '9') {
+            // Если токен - число, добавляем его в массив чисел
+            strcpy(numbers[num_count], token);
+            num_count++;
+        } else if (token[0] == '+' || token[0] == '-' || token[0] == '*' || token[0] == '!' || token[0] == '^') {
+            // Если токен - оператор, добавляем его в массив операторов
+            operators[op_count] = token[0];
+            op_count++;
+        }
+        token = strtok(NULL, " \n");
+    }
+}
