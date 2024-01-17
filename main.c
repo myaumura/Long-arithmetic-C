@@ -6,6 +6,13 @@
 
 #define MAX_DIGITS 2500
 
+// MARK: - Структура большого числа
+typedef struct {
+    int digits[MAX_DIGITS];
+    short int length;
+    short int sign;
+} bn;
+
 // MARK: - Stack
 
 char stack[25];
@@ -17,14 +24,8 @@ void push(char*);
 char pop(void);
 int priority(char*);
 void convert(char(*)[], int, char(*)[]);
-int evaluate(char*);
+bn execute(char(*)[], int);
 
-// MARK: - Структура большого числа
-typedef struct {
-    int digits[MAX_DIGITS];
-    short int length;
-    short int sign;
-} bn;
 
 // MARK: - Expression
 
@@ -69,7 +70,7 @@ void bn_copy(bn*, bn*);
 // MARK: - Main
 
 int main(void) {
-    
+   
     parse_expression();
     
     return EXIT_SUCCESS;
@@ -350,7 +351,6 @@ void bn_copy(bn* src, bn* dst) {
 // MARK: - Чтение выражения
 
 void parse_expression(void) {
-    
     char buffer[2500];
     fgets(buffer, sizeof(buffer), stdin);
     execute_expression(buffer);
@@ -436,16 +436,10 @@ void execute_expression(char* buffer) {
     }
     temp[i] = '\0';
     int num_count = string_to_tokens(temp, tokens);
-    
-//    if (num_count == 2) {
-//        bn_create(tokens[0]);
-//        bn_create(tokens[1]);
-//
-//    } else {
-//        convert(tokens, num_count ,postfix);
-//    }
+    // нужно реализовать либо мат выражение, либо сумма от и до
     convert(tokens, num_count ,postfix);
-    
+    bn result = execute(postfix, num_count);
+    bn_print(&result);
 }
 
 // MARK: - Проверка символа на оператор
@@ -457,7 +451,7 @@ int is_operator(char* c) {
     return 0;
 }
 
-// MARK: - Проверка цифры
+// MARK: - Проверка на число
 
 int is_number(char* c) {
     int i = 0;
@@ -501,46 +495,108 @@ void convert(char infix[][2500], int num_count, char postfix[][2500]) {
             } else {
                 while (priority(symbol) < priority(&stack[top])) {
                     strncpy(postfix[j++], &stack[top--], 1);
-//                    strcpy(postfix[j], &stack[top--]);
                 }
                 push(symbol);
             }
         }
     }
-    
     while (stack[top] != '#') {
-//        printf("%s\n", &(stack[top--]));
         strncpy(postfix[j++], &stack[top--], 1);
     }
-    
     char end_str = '\0';
     strcpy(postfix[j], &end_str);
 }
 
-//int evaluate(char* postfix) {
-//    char ch;
-//    int i = 0, operand1, operand2;
-//
-//    while ((ch = postfix[i++]) != '\0') {
-//
-//        if (isdigit(ch)) {
-//            push_int(ch - '0');
-//        } else {
-//            operand2 = pop_int();
-//            operand1 = pop_int();
-//
-//            switch (ch) {
-//                case '+':
-//                    push_int(operand1 + operand2);
-//                    break;
-//                default:
-//                    break;
-//            }
-//        }
-//
+
+struct Stack {
+    char data[100][2500];
+    int top;
+};
+
+// Инициализация стека
+void initializeStack(struct Stack *stack) {
+    stack->top = -1;
+}
+
+// Проверка, пуст ли стек
+int isEmpty(struct Stack *stack) {
+    return stack->top == -1;
+}
+
+// Помещение элемента в стек
+void push_stack(struct Stack *stack, const char *item) {
+//    if (stack->top == 100 - 1) {
+//        printf("Стек переполнен. Невозможно добавить элемент.\n");
+//        exit(EXIT_FAILURE);
 //    }
-//    return stack_int[top_int];
-//}
+
+    stack->top++;
+    strcpy(stack->data[stack->top], item);
+}
+
+// Извлечение элемента из стека
+char* pop_stack(struct Stack *stack) {
+//    if (isEmpty(stack)) {
+//        printf("Стек пуст. Невозможно извлечь элемент.\n");
+//        exit(EXIT_FAILURE);
+//    }
+    return stack->data[stack->top--];
+}
+
+bn execute(char postfix[][2500], int count) {
+    struct Stack stack;
+    initializeStack(&stack);
+    
+    bn result, operand1, operand2;;
+    bn_init(&result);
+    char token[2500], token1[2500], token2[2500];
+    int i = 0, j = 0;
+    
+    while (i < count) {
+       
+        if (is_number(postfix[j])) {
+            // кладем числа в стек
+            push_stack(&stack, postfix[j++]);
+        } else {
+            strcpy(token, postfix[j++]);
+            
+            if (is_operator(token)) {
+               
+                // копируем из стека
+                strcpy(token2, pop_stack(&stack));
+                strcpy(token1, pop_stack(&stack));
+
+                // создаем два числа
+                operand2 = bn_create(token2);
+                operand1 = bn_create(token1);
+                
+                bn_print(&operand2);
+                bn_print(&operand1);
+
+                switch (token[0]) {
+                    case '+':
+                        result = bn_add(&operand1, &operand2);
+                        break;
+                    case '-':
+                        result = bn_sub(&operand1, &operand2);
+                        break;
+                    case '*':
+                        result = bn_mul(&operand1, &operand2);
+                        break;
+                    case '^':
+                        result = bn_pow(&operand1, &operand2);
+                        break;
+                    case '!':
+                        result = bn_fact(&operand2);
+                        break;
+                }
+            }
+            
+        }
+        i++;
+    }
+    return result;
+}
 
 // MARK: - Добавление пробела перед оператором
 
