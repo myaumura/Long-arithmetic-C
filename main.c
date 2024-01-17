@@ -30,9 +30,7 @@ bn execute(char(*)[], int);
 // MARK: - Expression
 
 void parse_expression(void);
-bn perform_operation(char, bn*, bn*);
 void execute_expression(char*);
-bn evaluate_expression(char*);
 int string_to_tokens(char *expression, char(*)[]);
 void add_space(char *expression, char *result);
 bn execute_bn(char*);
@@ -66,13 +64,12 @@ void bn_inc(bn*);
 int  bn_cmp(bn*, bn*);
 void bn_clear_nulls(bn*);
 void bn_copy(bn*, bn*);
+char* bn_to_string(bn*);
 
 // MARK: - Main
 
 int main(void) {
-   
     parse_expression();
-    
     return EXIT_SUCCESS;
 }
 
@@ -359,7 +356,6 @@ void parse_expression(void) {
 // MARK: - Функция определения приоритета оператора
 
 int priority(char* operator) {
-    
     switch (operator[0]) {
         case '!':
             return 5;
@@ -378,46 +374,9 @@ int priority(char* operator) {
     }
 }
 
-// MARK: - Операции
-
-bn perform_operation(char operator, bn* first_num, bn* second_num) {
-    bn result;
-    bn_init(&result);
-    
-    switch (operator) {
-        case '+':
-            result = bn_add(first_num, second_num);
-            break;
-        case '-':
-            result = bn_sub(first_num, second_num);
-            break;
-        case '*':
-            result = bn_mul(first_num, second_num);
-            break;
-        case '^':
-            result = bn_pow(first_num, second_num);
-            break;
-        case '!':
-            result = bn_fact(first_num);
-            break;
-        default:
-            break;
-    }
-    return result;
-}
-
-// MARK: - execute bn
-// ?????
-bn execute_bn(char* str) {
-    bn num;
-    bn_init(&num);
-    return num;
-}
-
 // MARK: - Вычисление выражения
 
 void execute_expression(char* buffer) {
-    
     char temp[2500], postfix[100][2500];
     char tokens[100][2500];
     size_t i = 0, flag = 0;
@@ -507,41 +466,33 @@ void convert(char infix[][2500], int num_count, char postfix[][2500]) {
     strcpy(postfix[j], &end_str);
 }
 
+// MARK: - Стуктура стека
 
 struct Stack {
     char data[100][2500];
     int top;
 };
 
-// Инициализация стека
+// MARK: - Функция инициализации стека
+
 void initializeStack(struct Stack *stack) {
     stack->top = -1;
 }
 
-// Проверка, пуст ли стек
-int isEmpty(struct Stack *stack) {
-    return stack->top == -1;
-}
+// MARK: - Помещение элемента в стек
 
-// Помещение элемента в стек
 void push_stack(struct Stack *stack, const char *item) {
-//    if (stack->top == 100 - 1) {
-//        printf("Стек переполнен. Невозможно добавить элемент.\n");
-//        exit(EXIT_FAILURE);
-//    }
-
     stack->top++;
     strcpy(stack->data[stack->top], item);
 }
 
-// Извлечение элемента из стека
+// MARK: - Извлечение элемента из стека
+
 char* pop_stack(struct Stack *stack) {
-//    if (isEmpty(stack)) {
-//        printf("Стек пуст. Невозможно извлечь элемент.\n");
-//        exit(EXIT_FAILURE);
-//    }
     return stack->data[stack->top--];
 }
+
+// MARK: - Вычисление выражения
 
 bn execute(char postfix[][2500], int count) {
     struct Stack stack;
@@ -551,27 +502,21 @@ bn execute(char postfix[][2500], int count) {
     bn_init(&result);
     char token[2500], token1[2500], token2[2500];
     int i = 0, j = 0;
-    
+   
     while (i < count) {
        
         if (is_number(postfix[j])) {
-            // кладем числа в стек
             push_stack(&stack, postfix[j++]);
         } else {
             strcpy(token, postfix[j++]);
             
             if (is_operator(token)) {
                
-                // копируем из стека
                 strcpy(token2, pop_stack(&stack));
                 strcpy(token1, pop_stack(&stack));
 
-                // создаем два числа
                 operand2 = bn_create(token2);
                 operand1 = bn_create(token1);
-                
-                bn_print(&operand2);
-                bn_print(&operand1);
 
                 switch (token[0]) {
                     case '+':
@@ -590,8 +535,9 @@ bn execute(char postfix[][2500], int count) {
                         result = bn_fact(&operand2);
                         break;
                 }
+                char* result_str = bn_to_string(&result);
+                push_stack(&stack, result_str);
             }
-            
         }
         i++;
     }
@@ -619,7 +565,6 @@ void add_space(char *expression, char *result) {
 // MARK: - Разделение строки на числа и операторы
 
 int string_to_tokens(char *expression, char tokens[][2500]) {
-    
     char spacedExpression[2 * MAX_DIGITS];
     int num_count = 0;
     add_space(expression, spacedExpression);
@@ -633,4 +578,27 @@ int string_to_tokens(char *expression, char tokens[][2500]) {
         token = strtok(NULL, " \n");
     }
     return num_count;
+}
+
+// MARK: - Функция преобразования большого числа в строку
+
+char* bn_to_string(bn* num) {
+    int buffer_size = 0;
+    
+    for (int i = 0; i < num->length; i++) {
+        buffer_size += snprintf(NULL, 0, "%d", num->digits[i]);
+    }
+    char *result = (char *)malloc(buffer_size + 1);
+    
+    int position = 0;
+    for (int i = 0; i < num->length; i++) {
+        position += snprintf(result + position, buffer_size - position + 1, "%d", num->digits[i]);
+    }
+    
+    for (int i = 0, j = position - 1; i < j; i++, j--) {
+        char temp = result[i];
+        result[i] = result[j];
+        result[j] = temp;
+    }
+    return result;
 }
